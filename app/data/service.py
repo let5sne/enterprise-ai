@@ -30,6 +30,11 @@ class DataService:
         if intent.analysis_type == "ranking" and not dimension_info:
             return DataAnalysisResult(success=False, error="无法识别排名维度")
 
+        intent.metric = metric_info.get("code")
+        if dimension_info:
+            intent.dimension = dimension_info.get("code")
+        intent.time_range = time_range
+
         allowed_identifiers = {
             metric_info["table"],
             metric_info["field"],

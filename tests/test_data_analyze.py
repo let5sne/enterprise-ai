@@ -31,6 +31,8 @@ def test_registry_resolves_known_capabilities() -> None:
     assert registry.get("data.analyze") is not None
     assert registry.get("content.generate") is not None
     assert registry.get("knowledge.ask") is None
+    assert "data.analyze" in registry.list_codes()
+    assert "content.generate" in registry.list_codes()
 
 
 def test_orchestration_data_plus_content_chain() -> None:
