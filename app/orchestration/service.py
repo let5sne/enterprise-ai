@@ -1,5 +1,6 @@
 from typing import Any
 
+from app.context.store import InMemoryContextStore
 from app.schemas.capability import CapabilityExecutionResult, ExecutionPlan, PlanExecutionResult, PlanStep
 
 from .capability_mapper import CapabilityMapper
@@ -12,7 +13,7 @@ from .registry import CapabilityRegistry
 
 
 class OrchestrationService:
-    def __init__(self) -> None:
+    def __init__(self, context_store: InMemoryContextStore | None = None) -> None:
         self.preprocessor = MessagePreprocessor()
         self.intent_classifier = IntentClassifier()
         self.complexity = ComplexityEvaluator()
@@ -20,6 +21,7 @@ class OrchestrationService:
         self.mapper = CapabilityMapper()
         self.builder = PlanBuilder()
         self.registry = CapabilityRegistry()
+        self.context_store = context_store or InMemoryContextStore()
 
     def plan(self, message: str) -> ExecutionPlan:
         features = self.preprocessor.parse(message)
@@ -35,10 +37,11 @@ class OrchestrationService:
         mapped = self.mapper.map_multi(steps)
         return self.builder.build(intent, mapped)
 
-    def execute(self, plan: ExecutionPlan) -> PlanExecutionResult:
+    def execute(self, plan: ExecutionPlan, session_id: str | None = None) -> PlanExecutionResult:
         step_results: list[CapabilityExecutionResult] = []
         step_results_by_no: dict[int, CapabilityExecutionResult] = {}
         latest_structured: dict[str, Any] = {}
+        latest_summary: str | None = None
 
         for step in plan.steps:
             payload = dict(step.input_data)
@@ -80,19 +83,56 @@ class OrchestrationService:
                 )
             if result.success and result.structured_result:
                 latest_structured = result.structured_result
+            if result.success and result.human_readable_text:
+                latest_summary = result.human_readable_text
 
             step_results.append(result)
             step_results_by_no[step.step_no] = result
 
-        return PlanExecutionResult(
+        result = PlanExecutionResult(
             plan_id=plan.plan_id,
             intent=plan.intent,
             step_results=step_results,
         )
 
-    def run(self, message: str) -> PlanExecutionResult:
+        # Persist context if session_id provided
+        if session_id:
+            task = self.context_store.get_task(session_id)
+            task.latest_intent = plan.intent
+            task.latest_plan_id = plan.plan_id
+            task.last_successful_step_no = max(
+                (step.step_no for step in step_results if step.success),
+                default=0,
+            )
+            task.important_outputs = {
+                "latest_structured_result": latest_structured,
+                "latest_summary_text": latest_summary,
+            }
+            self.context_store.save_task(task)
+
+        return result
+
+
+    def run(self, message: str, session_id: str | None = None) -> PlanExecutionResult:
+        # Append user message to session context if session_id provided
+        if session_id:
+            self.context_store.append_message(session_id, "user", message)
+
         plan = self.plan(message)
-        return self.execute(plan)
+        result = self.execute(plan, session_id)
+
+        # Append assistant response summary to session context
+        if session_id and result.step_results:
+            last_step = result.step_results[-1]
+            summary = (
+                last_step.human_readable_text
+                or last_step.structured_result
+                or "Execution completed"
+            )
+            self.context_store.append_message(session_id, "assistant", str(summary))
+
+        return result
+
 
     def _apply_input_bindings(
         self,

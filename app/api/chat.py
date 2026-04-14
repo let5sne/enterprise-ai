@@ -19,8 +19,11 @@ async def chat_ask(
     request: ChatAskRequest,
     orchestration_service: OrchestrationService = Depends(get_orchestration_service),
 ) -> ChatAskResponse:
+    # Generate or use provided session_id
+    session_id = request.session_id or f"sess_{uuid.uuid4().hex[:12]}"
+
     try:
-        execution_result = orchestration_service.run(request.message)
+        execution_result = orchestration_service.run(request.message, session_id)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
@@ -28,7 +31,7 @@ async def chat_ask(
         raise HTTPException(status_code=500, detail="internal server error") from exc
 
     return ChatAskResponse(
-        session_id=request.session_id or "sess_demo",
+        session_id=session_id,
         answer=execution_result.summary_text,
         capabilities_used=[step.capability_code for step in execution_result.step_results],
         trace_id=f"trace_{uuid.uuid4().hex[:12]}",

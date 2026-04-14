@@ -6,6 +6,7 @@ from app.orchestration.decomposer import TaskDecomposer
 from app.orchestration.capability_mapper import CapabilityMapper
 from app.orchestration.preprocessor import MessagePreprocessor
 from app.schemas.capability import ExecutionPlan, InputBinding, PlanStep
+from app.context.store import InMemoryContextStore
 
 
 def test_data_analyze_ranking_top1() -> None:
@@ -217,3 +218,88 @@ def test_knowledge_pattern_requires_context() -> None:
     intent = classifier.classify(features)
     # Should trigger knowledge_plus_content
     assert intent == "knowledge_plus_content"
+
+
+def test_context_store_appends_messages_with_rolling_buffer() -> None:
+    """Test that context store appends messages and maintains rolling 10-message buffer"""
+    store = InMemoryContextStore()
+    session_id = "sess_test_001"
+    
+    # Add 15 messages; only latest 10 should be retained
+    for i in range(15):
+        role = "user" if i % 2 == 0 else "assistant"
+        store.append_message(session_id, role, f"message_{i}")
+    
+    session = store.get_session(session_id)
+    assert len(session.recent_messages) == 10
+    assert session.recent_messages[0].content == "message_5"  # First message is the 6th one added
+    assert session.recent_messages[-1].content == "message_14"  # Last message is the 15th one added
+
+
+def test_task_context_updates_after_run() -> None:
+    """Test that task context is populated with execution results after run()"""
+    store = InMemoryContextStore()
+    orchestration = OrchestrationService(context_store=store)
+    session_id = "sess_test_002"
+    
+    result = orchestration.run("上个月哪个部门成本最高", session_id)
+    
+    task = store.get_task(session_id)
+    assert task.latest_intent is not None
+    assert task.latest_plan_id == result.plan_id
+    assert task.last_successful_step_no > 0
+    assert task.important_outputs["latest_structured_result"] is not None
+    assert task.important_outputs["latest_summary_text"] is not None
+
+
+def test_same_session_can_continue_previous_task() -> None:
+    """Test that same session_id can read/write across multiple run() calls"""
+    store = InMemoryContextStore()
+    orchestration = OrchestrationService(context_store=store)
+    session_id = "sess_test_003"
+    
+    # First message
+    result1 = orchestration.run("上个月哪个部门成本最高", session_id)
+    assert result1.step_results[0].success is True
+    
+    # Second message in same session
+    result2 = orchestration.run("写一段说明", session_id)
+    
+    # Verify both messages are in session history
+    session = store.get_session(session_id)
+    messages = session.recent_messages
+    assert len(messages) >= 4  # At least 2 user + 2 assistant messages
+    assert messages[0].role == "user"
+    assert "上个月" in messages[0].content or "成本最高" in messages[0].content
+    
+    # Verify task context tracks the latest execution
+    task = store.get_task(session_id)
+    assert task.latest_plan_id == result2.plan_id
+
+
+def test_different_sessions_are_isolated() -> None:
+    """Test that different session_ids maintain independent contexts"""
+    store = InMemoryContextStore()
+    orchestration = OrchestrationService(context_store=store)
+    
+    session1 = "sess_test_004_a"
+    session2 = "sess_test_004_b"
+    
+    # Execute in first session
+    orchestration.run("上个月哪个部门成本最高", session1)
+    
+    # Execute in second session with different message
+    orchestration.run("本月销售额是多少", session2)
+    
+    # Verify isolation: each session should have only its own messages
+    messages1 = store.get_session(session1).recent_messages
+    messages2 = store.get_session(session2).recent_messages
+    
+    # Session 1 messages should not contain session 2 content
+    session1_content = " ".join(m.content for m in messages1)
+    assert "销售额" not in session1_content or "成本最高" in session1_content
+    
+    # Different planning should result in different plan IDs
+    task1 = store.get_task(session1)
+    task2 = store.get_task(session2)
+    assert task1.latest_plan_id != task2.latest_plan_id
