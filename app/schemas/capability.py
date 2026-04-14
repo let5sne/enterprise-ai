@@ -3,10 +3,17 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class InputBinding(BaseModel):
+    from_step_no: int
+    from_field: str
+    to_param: str
+
+
 class PlanStep(BaseModel):
     step_no: int
     capability_code: str
     input_data: dict[str, Any] = Field(default_factory=dict)
+    input_bindings: list[InputBinding] = Field(default_factory=list)
 
 
 class ExecutionPlan(BaseModel):

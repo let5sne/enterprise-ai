@@ -1,4 +1,4 @@
-from app.schemas.capability import PlanStep
+from app.schemas.capability import InputBinding, PlanStep
 
 
 class CapabilityMapper:
@@ -25,11 +25,21 @@ class CapabilityMapper:
 
         for i, item in enumerate(steps):
             code = "data.analyze" if item["type"] == "data" else "content.generate"
+            bindings: list[InputBinding] = []
+            if code == "content.generate" and i > 0:
+                bindings.append(
+                    InputBinding(
+                        from_step_no=i,
+                        from_field="structured_result",
+                        to_param="upstream",
+                    )
+                )
             result.append(
                 PlanStep(
                     step_no=i + 1,
                     capability_code=code,
                     input_data={"text": item["message"]},
+                    input_bindings=bindings,
                 )
             )
 
