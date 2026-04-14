@@ -4,6 +4,7 @@ from app.orchestration.service import OrchestrationService
 from app.orchestration.intent_classifier import IntentClassifier
 from app.orchestration.decomposer import TaskDecomposer
 from app.orchestration.capability_mapper import CapabilityMapper
+from app.orchestration.preprocessor import MessagePreprocessor
 from app.schemas.capability import ExecutionPlan, InputBinding, PlanStep
 
 
@@ -167,3 +168,52 @@ def test_orchestration_knowledge_plus_content_execution() -> None:
     assert result.step_results[1].success is True
     assert result.step_results[1].structured_result is not None
     assert "," in result.summary_text or "。" in result.summary_text
+
+
+def test_intent_classifier_avoids_generic_word_misidentification() -> None:
+    """Test that generic words like '要求' don't trigger knowledge intent incorrectly"""
+    classifier = IntentClassifier()
+    preprocessor = MessagePreprocessor()
+    
+    # "根据用户要求生成报告" should be content_only (generic 要求), not knowledge_plus_content
+    features = preprocessor.parse("根据用户要求生成报告")
+    intent = classifier.classify(features)
+    
+    assert intent == "content_only"
+    assert features["has_generate"] is True
+    assert features["has_knowledge"] is False  # Generic "要求" shouldn't match strict KNOWLEDGE_PATTERN
+
+
+def test_intent_classifier_prioritizes_data_over_knowledge() -> None:
+    """When both data and knowledge features are present, data takes priority to avoid false positives"""
+    classifier = IntentClassifier()
+    preprocessor = MessagePreprocessor()
+    
+    # "按照审批金额生成统计" has both data ("金额","统计") and vague knowledge ("审批")
+    # Should be treated as data-focused, not knowledge_plus_content
+    features = preprocessor.parse("按照审批金额生成统计")
+    intent = classifier.classify(features)
+    
+    # The priority rule should prevent this from being knowledge_plus_content
+    # It should be data_plus_content (both data and generate present)
+    assert intent == "data_plus_content" or intent == "content_only"
+    assert intent != "knowledge_plus_content"
+
+
+def test_knowledge_pattern_requires_context() -> None:
+    """Knowledge pattern should not trigger on generic 'requirements' without institutional context"""
+    classifier = IntentClassifier()
+    preprocessor = MessagePreprocessor()
+    
+    # Generic requirements without institutional words should not trigger knowledge
+    # "根据用户要求生成报告" - "要求" is too generic to indicate knowledge/policy
+    features = preprocessor.parse("根据用户要求生成报告")
+    intent = classifier.classify(features)
+    # Should be content_only, not knowledge_plus_content
+    assert intent == "content_only"
+    
+    # Proper knowledge case with institutional context should trigger knowledge
+    features = preprocessor.parse("根据采购审批要求，写一份说明")
+    intent = classifier.classify(features)
+    # Should trigger knowledge_plus_content
+    assert intent == "knowledge_plus_content"
