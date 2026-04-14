@@ -1,21 +1,18 @@
 from typing import Any
 
-from app.content import ContentService
+from app.knowledge import KnowledgeService
 from app.schemas.capability import CapabilityExecutionResult, PlanStep
 
 
-class ContentGenerateHandler:
-    capability_code = "content.generate"
+class KnowledgeAskHandler:
+    capability_code = "knowledge.ask"
 
     def __init__(self) -> None:
-        self.content_service = ContentService()
+        self.knowledge_service = KnowledgeService()
 
     def execute(self, step: PlanStep, payload: dict[str, Any]) -> CapabilityExecutionResult:
         try:
-            text, structured = self.content_service.generate(
-                instruction=str(payload.get("text", "")),
-                source_data=payload.get("upstream") or {},
-            )
+            answer, structured = self.knowledge_service.ask(str(payload.get("text", "")))
         except Exception as exc:
             return CapabilityExecutionResult(
                 step_no=step.step_no,
@@ -28,7 +25,7 @@ class ContentGenerateHandler:
             step_no=step.step_no,
             capability_code=step.capability_code,
             success=True,
-            human_readable_text=text,
+            human_readable_text=answer,
             structured_result=structured,
-            raw_data={"source": "content_service"},
+            raw_data={"citations": structured.get("citations", []), "source": "knowledge_service"},
         )

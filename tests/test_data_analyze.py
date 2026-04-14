@@ -30,9 +30,10 @@ def test_registry_resolves_known_capabilities() -> None:
 
     assert registry.get("data.analyze") is not None
     assert registry.get("content.generate") is not None
-    assert registry.get("knowledge.ask") is None
+    assert registry.get("knowledge.ask") is not None
     assert "data.analyze" in registry.list_codes()
     assert "content.generate" in registry.list_codes()
+    assert "knowledge.ask" in registry.list_codes()
 
 
 def test_orchestration_data_plus_content_chain() -> None:
@@ -59,7 +60,7 @@ def test_execute_unknown_capability_returns_failed_step() -> None:
         steps=[
             PlanStep(
                 step_no=1,
-                capability_code="knowledge.ask",
+                capability_code="workflow.status",
                 input_data={"text": "hello"},
             )
         ],
