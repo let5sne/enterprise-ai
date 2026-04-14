@@ -7,6 +7,9 @@ class IntentClassifier:
         if has_data and has_generate:
             return "data_plus_content"
 
+        if has_knowledge and has_generate:
+            return "knowledge_plus_content"
+
         if has_data:
             return "data_only"
 

@@ -24,7 +24,15 @@ class CapabilityMapper:
         result: list[PlanStep] = []
 
         for i, item in enumerate(steps):
-            code = "data.analyze" if item["type"] == "data" else "content.generate"
+            step_type = item["type"]
+            
+            if step_type == "data":
+                code = "data.analyze"
+            elif step_type == "knowledge":
+                code = "knowledge.ask"
+            else:
+                code = "content.generate"
+            
             bindings: list[InputBinding] = []
             if code == "content.generate" and i > 0:
                 bindings.append(
@@ -34,6 +42,7 @@ class CapabilityMapper:
                         to_param="upstream",
                     )
                 )
+            
             result.append(
                 PlanStep(
                     step_no=i + 1,

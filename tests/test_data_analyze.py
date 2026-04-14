@@ -1,6 +1,9 @@
 from app.data.service import DataService
 from app.orchestration.registry import CapabilityRegistry
 from app.orchestration.service import OrchestrationService
+from app.orchestration.intent_classifier import IntentClassifier
+from app.orchestration.decomposer import TaskDecomposer
+from app.orchestration.capability_mapper import CapabilityMapper
 from app.schemas.capability import ExecutionPlan, InputBinding, PlanStep
 
 
@@ -113,3 +116,54 @@ def test_execute_binding_source_not_found_returns_failed_step() -> None:
     assert result.step_results[1].success is False
     assert "input binding failed" in (result.step_results[1].error or "")
     assert "source step not found" in (result.step_results[1].error or "")
+
+
+def test_intent_classifier_recognizes_knowledge_plus_content() -> None:
+    classifier = IntentClassifier()
+    
+    features = {
+        "has_knowledge": True,
+        "has_generate": True,
+    }
+    intent = classifier.classify(features)
+    
+    assert intent == "knowledge_plus_content"
+
+
+def test_decomposer_splits_knowledge_plus_content() -> None:
+    decomposer = TaskDecomposer()
+    
+    tasks = decomposer.multi_steps(
+        "knowledge_plus_content",
+        "根据采购审批要求，写一份采购计划说明"
+    )
+    
+    assert len(tasks) == 2
+    assert tasks[0]["type"] == "knowledge"
+    assert tasks[1]["type"] == "content"
+    assert tasks[0]["message"] == "根据采购审批要求，写一份采购计划说明"
+    assert tasks[1]["message"] == "根据采购审批要求，写一份采购计划说明"
+
+
+def test_orchestration_knowledge_plus_content_plan() -> None:
+    orchestration = OrchestrationService()
+    plan = orchestration.plan("根据采购审批要求，生成一份说明")
+    
+    assert len(plan.steps) == 2
+    assert plan.steps[0].capability_code == "knowledge.ask"
+    assert plan.steps[1].capability_code == "content.generate"
+    assert plan.steps[1].input_bindings
+    assert plan.steps[1].input_bindings[0].from_step_no == 1
+    assert plan.steps[1].input_bindings[0].from_field == "structured_result"
+    assert plan.steps[1].input_bindings[0].to_param == "upstream"
+
+
+def test_orchestration_knowledge_plus_content_execution() -> None:
+    orchestration = OrchestrationService()
+    result = orchestration.run("根据采购审批要求，写一段面向员工的解释")
+    
+    assert len(result.step_results) == 2
+    assert result.step_results[0].success is True
+    assert result.step_results[1].success is True
+    assert result.step_results[1].structured_result is not None
+    assert "," in result.summary_text or "。" in result.summary_text
