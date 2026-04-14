@@ -1,6 +1,7 @@
 from app.orchestration.handlers.content_generate import ContentGenerateHandler
 from app.orchestration.handlers.data_analyze import DataAnalyzeHandler
 from app.orchestration.handlers.base import CapabilityHandler
+from app.orchestration.handlers.knowledge_ask import KnowledgeAskHandler
 
 
 class CapabilityRegistry:
@@ -8,6 +9,7 @@ class CapabilityRegistry:
         handlers: list[CapabilityHandler] = [
             DataAnalyzeHandler(),
             ContentGenerateHandler(),
+            KnowledgeAskHandler(),
         ]
         self._handlers = {handler.capability_code: handler for handler in handlers}
 
