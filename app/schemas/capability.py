@@ -39,7 +39,7 @@ class PlanExecutionResult(BaseModel):
 
     @property
     def merged_structured_result(self) -> dict[str, Any]:
-        for item in self.step_results:
+        for item in reversed(self.step_results):
             if item.success and item.structured_result:
                 return item.structured_result
         return {}
