@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -23,3 +23,4 @@ class ChatAskResponse(BaseModel):
     answer: str
     capabilities_used: list[str] = Field(default_factory=list)
     trace_id: str
+    structured_result: dict[str, Any] = Field(default_factory=dict)

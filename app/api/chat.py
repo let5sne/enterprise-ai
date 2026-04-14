@@ -20,7 +20,7 @@ async def chat_ask(
     orchestration_service: OrchestrationService = Depends(get_orchestration_service),
 ) -> ChatAskResponse:
     try:
-        plan = orchestration_service.plan(request.message)
+        execution_result = orchestration_service.run(request.message)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
@@ -29,7 +29,8 @@ async def chat_ask(
 
     return ChatAskResponse(
         session_id=request.session_id or "sess_demo",
-        answer=f"[DEMO] generated plan: {plan.intent}",
-        capabilities_used=[step.capability_code for step in plan.steps],
+        answer=execution_result.summary_text,
+        capabilities_used=[step.capability_code for step in execution_result.step_results],
         trace_id=f"trace_{uuid.uuid4().hex[:12]}",
+        structured_result=execution_result.merged_structured_result,
     )
