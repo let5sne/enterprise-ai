@@ -8,4 +8,9 @@ class TaskDecomposer:
                 {"type": "data", "message": message},
                 {"type": "content", "message": message},
             ]
+        if intent == "knowledge_plus_content":
+            return [
+                {"type": "knowledge", "message": message},
+                {"type": "content", "message": message},
+            ]
         raise ValueError(f"intent '{intent}' is not a supported multi-step intent")
