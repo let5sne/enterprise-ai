@@ -13,3 +13,6 @@ class CapabilityRegistry:
 
     def get(self, capability_code: str) -> CapabilityHandler | None:
         return self._handlers.get(capability_code)
+
+    def list_codes(self) -> list[str]:
+        return list(self._handlers.keys())
