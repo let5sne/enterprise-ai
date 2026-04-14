@@ -15,6 +15,7 @@ class ContentGenerateHandler:
             text, structured = self.content_service.generate(
                 instruction=str(payload.get("text", "")),
                 source_data=payload.get("upstream") or {},
+                previous_text=str(payload.get("previous_text", "") or ""),
             )
         except Exception as exc:
             return CapabilityExecutionResult(

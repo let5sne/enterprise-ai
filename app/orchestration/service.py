@@ -1,11 +1,14 @@
 from typing import Any
+from uuid import uuid4
 
 from app.context.store import InMemoryContextStore
 from app.schemas.capability import CapabilityExecutionResult, ExecutionPlan, PlanExecutionResult, PlanStep
+from app.schemas.context import TaskContext
 
 from .capability_mapper import CapabilityMapper
 from .complexity import ComplexityEvaluator
 from .decomposer import TaskDecomposer
+from .followup_resolver import FollowupResolver
 from .intent_classifier import IntentClassifier
 from .plan_builder import PlanBuilder
 from .preprocessor import MessagePreprocessor
@@ -21,9 +24,13 @@ class OrchestrationService:
         self.mapper = CapabilityMapper()
         self.builder = PlanBuilder()
         self.registry = CapabilityRegistry()
+        self.followup_resolver = FollowupResolver()
         self.context_store = context_store or InMemoryContextStore()
 
-    def plan(self, message: str) -> ExecutionPlan:
+    def plan(self, message: str, task_context: TaskContext | None = None) -> ExecutionPlan:
+        if self.followup_resolver.should_resume(message, task_context):
+            return self._build_followup_plan(message, task_context)
+
         features = self.preprocessor.parse(message)
         intent = self.intent_classifier.classify(features)
         is_multi = self.complexity.is_multi(features, intent)
@@ -114,24 +121,47 @@ class OrchestrationService:
 
 
     def run(self, message: str, session_id: str | None = None) -> PlanExecutionResult:
+        task_context = self.context_store.get_task(session_id) if session_id else None
+
         # Append user message to session context if session_id provided
         if session_id:
             self.context_store.append_message(session_id, "user", message)
 
-        plan = self.plan(message)
+        plan = self.plan(message=message, task_context=task_context)
         result = self.execute(plan, session_id)
 
         # Append assistant response summary to session context
         if session_id and result.step_results:
-            last_step = result.step_results[-1]
-            summary = (
-                last_step.human_readable_text
-                or last_step.structured_result
-                or "Execution completed"
-            )
-            self.context_store.append_message(session_id, "assistant", str(summary))
+            self.context_store.append_message(session_id, "assistant", result.summary_text)
 
         return result
+
+
+    def _build_followup_plan(
+        self,
+        message: str,
+        task_context: TaskContext | None,
+    ) -> ExecutionPlan:
+        important_outputs = (task_context.important_outputs if task_context else {}) or {}
+
+        latest_structured_result = important_outputs.get("latest_structured_result", {}) or {}
+        latest_summary_text = important_outputs.get("latest_summary_text", "") or ""
+
+        return ExecutionPlan(
+            plan_id=f"plan_{uuid4().hex[:12]}",
+            intent="content_followup",
+            steps=[
+                PlanStep(
+                    step_no=1,
+                    capability_code="content.generate",
+                    input_data={
+                        "text": message,
+                        "upstream": latest_structured_result,
+                        "previous_text": latest_summary_text,
+                    },
+                )
+            ],
+        )
 
 
     def _apply_input_bindings(
