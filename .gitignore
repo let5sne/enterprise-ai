@@ -1,38 +1,58 @@
-# Python
+# Python bytecode and caches
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+*$py.class
 .Python
-*.egg-info/
-dist/
+
+# Build and packaging artifacts
 build/
+dist/
+*.egg-info/
 .eggs/
+pip-wheel-metadata/
 
 # Virtual environments
 .venv/
 venv/
 env/
+ENV/
 
 # SQLite databases
 *.db
 *.sqlite3
 
-# Environment files
+# Test and coverage outputs
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Type checker / linter caches
+.mypy_cache/
+.pyre/
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Runtime logs and temp files
+*.log
+*.pid
+*.tmp
+
+# Environment and local config
 .env
 .env.*
+!.env.example
 
-# IDE
-.idea/
+# IDE/editor settings
 .vscode/
+.idea/
 *.swp
 *.swo
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
-# OS
+# OS files
 .DS_Store
 Thumbs.db
