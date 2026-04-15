@@ -78,34 +78,46 @@ def test_task_context_saves_followup_metadata() -> None:
     assert task.important_outputs["followup_ready"] is True
 
 
-def test_phase_one_data_continue_phrase_falls_back_to_content_from_previous_data() -> None:
+def test_task_context_saves_latest_user_message() -> None:
     store = InMemoryContextStore()
     orchestration = OrchestrationService(context_store=store)
 
-    session_id = "sess_phase1_data_continue"
+    session_id = "sess_latest_user_message"
+
+    orchestration.run("帮我看上个月哪个部门成本最高", session_id=session_id)
+    task = store.get_task(session_id)
+
+    assert task.important_outputs["latest_user_message"] == "帮我看上个月哪个部门成本最高"
+
+
+def test_data_continue_followup_runs_data_analyze() -> None:
+    store = InMemoryContextStore()
+    orchestration = OrchestrationService(context_store=store)
+
+    session_id = "sess_phase2_data"
 
     first = orchestration.run("帮我看上个月哪个部门成本最高", session_id=session_id)
     assert first.intent == "data_only"
 
     second = orchestration.run("换成同比", session_id=session_id)
 
-    assert second.intent == "content_from_previous_data"
-    assert second.step_results[0].capability_code == "content.generate"
+    assert second.intent == "data_followup"
+    assert second.step_results[0].capability_code == "data.analyze"
 
 
-def test_phase_one_knowledge_continue_phrase_falls_back_to_content_from_previous_knowledge() -> None:
+def test_knowledge_continue_followup_runs_knowledge_ask() -> None:
     store = InMemoryContextStore()
     orchestration = OrchestrationService(context_store=store)
 
-    session_id = "sess_phase1_knowledge_continue"
+    session_id = "sess_phase2_knowledge"
 
     first = orchestration.run("采购审批要求是什么", session_id=session_id)
     assert first.intent == "knowledge_only"
 
     second = orchestration.run("补充审批节点", session_id=session_id)
 
-    assert second.intent == "content_from_previous_knowledge"
-    assert second.step_results[0].capability_code == "content.generate"
+    assert second.intent == "knowledge_followup"
+    assert second.step_results[0].capability_code == "knowledge.ask"
 
 
 def test_followup_rewrite_new_version() -> None:
