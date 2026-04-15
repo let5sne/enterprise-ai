@@ -9,6 +9,8 @@ from .capability_mapper import CapabilityMapper
 from .complexity import ComplexityEvaluator
 from .decomposer import TaskDecomposer
 from .followup_resolver import FollowupResolver
+from .followup_type_classifier import FollowupTypeClassifier
+from .followup_types import FollowupType
 from .intent_classifier import IntentClassifier
 from .plan_builder import PlanBuilder
 from .preprocessor import MessagePreprocessor
@@ -25,6 +27,7 @@ class OrchestrationService:
         self.builder = PlanBuilder()
         self.registry = CapabilityRegistry()
         self.followup_resolver = FollowupResolver()
+        self.followup_type_classifier = FollowupTypeClassifier()
         self.context_store = context_store or InMemoryContextStore()
 
     def plan(self, message: str, task_context: TaskContext | None = None) -> ExecutionPlan:
@@ -105,6 +108,12 @@ class OrchestrationService:
         # Persist context if session_id provided
         if session_id:
             task = self.context_store.get_task(session_id)
+            latest_success_capability_code = None
+            for step_result in reversed(result.step_results):
+                if step_result.success:
+                    latest_success_capability_code = step_result.capability_code
+                    break
+
             task.latest_intent = plan.intent
             task.latest_plan_id = plan.plan_id
             task.last_successful_step_no = max(
@@ -114,6 +123,9 @@ class OrchestrationService:
             task.important_outputs = {
                 "latest_structured_result": latest_structured,
                 "latest_summary_text": latest_summary,
+                "latest_capability_code": latest_success_capability_code,
+                "latest_output_type": self._resolve_output_type(latest_success_capability_code),
+                "followup_ready": bool(latest_success_capability_code and latest_summary),
             }
             self.context_store.save_task(task)
 
@@ -142,14 +154,23 @@ class OrchestrationService:
         message: str,
         task_context: TaskContext | None,
     ) -> ExecutionPlan:
+        followup_type = self.followup_type_classifier.classify(message, task_context)
+        followup_type = self._normalize_followup_type_for_phase_one(followup_type)
         important_outputs = (task_context.important_outputs if task_context else {}) or {}
 
         latest_structured_result = important_outputs.get("latest_structured_result", {}) or {}
         latest_summary_text = important_outputs.get("latest_summary_text", "") or ""
 
+        if followup_type == FollowupType.CONTENT_FROM_PREVIOUS_DATA:
+            intent = "content_from_previous_data"
+        elif followup_type == FollowupType.CONTENT_FROM_PREVIOUS_KNOWLEDGE:
+            intent = "content_from_previous_knowledge"
+        else:
+            intent = "content_followup"
+
         return ExecutionPlan(
             plan_id=f"plan_{uuid4().hex[:12]}",
-            intent="content_followup",
+            intent=intent,
             steps=[
                 PlanStep(
                     step_no=1,
@@ -158,10 +179,27 @@ class OrchestrationService:
                         "text": message,
                         "upstream": latest_structured_result,
                         "previous_text": latest_summary_text,
+                        "followup_type": followup_type,
                     },
                 )
             ],
         )
+
+    def _normalize_followup_type_for_phase_one(self, followup_type: str) -> str:
+        if followup_type == FollowupType.DATA_CONTINUE:
+            return FollowupType.CONTENT_FROM_PREVIOUS_DATA
+        if followup_type == FollowupType.KNOWLEDGE_CONTINUE:
+            return FollowupType.CONTENT_FROM_PREVIOUS_KNOWLEDGE
+        return followup_type
+
+    def _resolve_output_type(self, capability_code: str | None) -> str:
+        if capability_code == "content.generate":
+            return "content"
+        if capability_code == "data.analyze":
+            return "data"
+        if capability_code == "knowledge.ask":
+            return "knowledge"
+        return ""
 
 
     def _apply_input_bindings(
