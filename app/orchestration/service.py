@@ -8,6 +8,7 @@ from app.schemas.context import TaskContext
 from .capability_mapper import CapabilityMapper
 from .complexity import ComplexityEvaluator
 from .decomposer import TaskDecomposer
+from .followup_question_builder import FollowupQuestionBuilder
 from .followup_resolver import FollowupResolver
 from .followup_type_classifier import FollowupTypeClassifier
 from .followup_types import FollowupType
@@ -28,6 +29,7 @@ class OrchestrationService:
         self.registry = CapabilityRegistry()
         self.followup_resolver = FollowupResolver()
         self.followup_type_classifier = FollowupTypeClassifier()
+        self.followup_question_builder = FollowupQuestionBuilder()
         self.context_store = context_store or InMemoryContextStore()
 
     def plan(self, message: str, task_context: TaskContext | None = None) -> ExecutionPlan:
@@ -132,7 +134,7 @@ class OrchestrationService:
         latest_user_message = important_outputs.get("latest_user_message", "") or ""
 
         if followup_type == FollowupType.DATA_CONTINUE:
-            merged_question = self._merge_followup_question(
+            merged_question = self.followup_question_builder.build(
                 message=message,
                 latest_user_message=latest_user_message,
                 latest_summary_text=latest_summary_text,
@@ -151,7 +153,7 @@ class OrchestrationService:
             )
 
         if followup_type == FollowupType.KNOWLEDGE_CONTINUE:
-            merged_question = self._merge_followup_question(
+            merged_question = self.followup_question_builder.build(
                 message=message,
                 latest_user_message=latest_user_message,
                 latest_summary_text=latest_summary_text,
@@ -229,22 +231,6 @@ class OrchestrationService:
             "followup_ready": bool(latest_success_capability_code and real_summary_text),
         }
         self.context_store.save_task(task)
-
-    def _merge_followup_question(
-        self,
-        message: str,
-        latest_user_message: str,
-        latest_summary_text: str,
-        domain: str,
-    ) -> str:
-        base = latest_user_message.strip() or latest_summary_text.strip()
-        if not base:
-            return message
-        if domain == "data":
-            return f"基于刚才的数据分析需求“{base}”，请继续按这个要求处理：{message}"
-        if domain == "knowledge":
-            return f"基于刚才的制度/规则问题“{base}”，请继续补充说明：{message}"
-        return f"基于刚才的内容“{base}”，请继续处理：{message}"
 
     def _resolve_output_type(self, capability_code: str | None) -> str:
         if capability_code == "content.generate":
