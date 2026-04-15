@@ -1,7 +1,10 @@
 # Python bytecode and caches
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
 *$py.class
+.Python
 
 # Build and packaging artifacts
 build/
@@ -15,6 +18,10 @@ pip-wheel-metadata/
 venv/
 env/
 ENV/
+
+# SQLite databases
+*.db
+*.sqlite3
 
 # Test and coverage outputs
 .pytest_cache/
@@ -43,6 +50,8 @@ htmlcov/
 # IDE/editor settings
 .vscode/
 .idea/
+*.swp
+*.swo
 
 # OS files
 .DS_Store
