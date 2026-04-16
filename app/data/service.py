@@ -53,9 +53,29 @@ class DataService:
         rows = self.executor.execute(sql)
         summary_text, structured = self.summarizer.summarize(intent, rows)
 
+        # Enrich structured_result so capability handlers can build rich artifacts.
+        enriched = dict(structured)
+        enriched["rows"] = rows
+        enriched["meta"] = {
+            "analysis_type": intent.analysis_type,
+            "dimension_label": self._lookup_label(self.semantic.DIMENSIONS, dimension_info),
+            "metric_label": self._lookup_label(self.semantic.METRICS, metric_info),
+        }
+
         return DataAnalysisResult(
             success=True,
             summary_text=summary_text,
-            structured_result=structured,
+            structured_result=enriched,
             raw_sql=sql,
         )
+
+    @staticmethod
+    def _lookup_label(
+        mapping: dict[str, dict[str, str]], target: dict[str, str] | None
+    ) -> str | None:
+        if not target:
+            return None
+        for label, value in mapping.items():
+            if value is target:
+                return label
+        return None

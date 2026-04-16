@@ -34,7 +34,9 @@ class ArtifactItem(BaseModel):
 
     artifact_type: Literal["table", "text", "chart", "file"]
     name: str
+    title: str | None = None
     content: list[Any] | dict[str, Any] | str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class TaskContextSnapshot(BaseModel):
