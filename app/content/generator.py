@@ -1,4 +1,20 @@
-class ContentGenerator:
+import json
+import logging
+from typing import Any
+
+from app.llm import prompts as llm_prompts
+from app.llm.client import LLMClient
+
+logger = logging.getLogger(__name__)
+
+
+class TemplateContentGenerator:
+    """Deterministic, rule- and template-based content generator.
+
+    Used as the default path when LLM is disabled, and as a safety-net
+    fallback inside LLMContentGenerator when the LLM call fails.
+    """
+
     FOLLOWUP_KEYWORDS = (
         "继续",
         "再正式一点",
@@ -67,3 +83,80 @@ class ContentGenerator:
             return f"根据已有资料，建议表述为：{source_data['answer']}"
 
         return f"基于你的需求，我先给出说明草稿：{instruction}。"
+
+
+class LLMContentGenerator:
+    """LLM-backed generator. On any failure falls back to TemplateContentGenerator."""
+
+    def __init__(
+        self,
+        llm_client: LLMClient,
+        fallback: TemplateContentGenerator | None = None,
+    ) -> None:
+        self.llm_client = llm_client
+        self.fallback = fallback or TemplateContentGenerator()
+
+    def _build_prompt(
+        self,
+        instruction: str,
+        source_data: dict[str, Any],
+        previous_text: str,
+    ) -> str:
+        if previous_text:
+            return llm_prompts.CONTENT_REFINE_TEMPLATE.format(
+                instruction=instruction,
+                previous_text=previous_text,
+            )
+
+        if source_data:
+            # Route to knowledge-flavored prompt when upstream looks like a
+            # knowledge answer (has "answer" or "citations"); otherwise treat
+            # it as analytical data.
+            is_knowledge = "answer" in source_data or "citations" in source_data
+            template = (
+                llm_prompts.CONTENT_FROM_KNOWLEDGE_TEMPLATE
+                if is_knowledge
+                else llm_prompts.CONTENT_FROM_DATA_TEMPLATE
+            )
+            return template.format(
+                instruction=instruction,
+                source_data=json.dumps(source_data, ensure_ascii=False, indent=2, default=str),
+            )
+
+        return llm_prompts.CONTENT_PLAIN_TEMPLATE.format(instruction=instruction)
+
+    def generate(
+        self,
+        instruction: str,
+        source_data: dict | None = None,
+        previous_text: str | None = None,
+    ) -> str:
+        instr = (instruction or "").strip()
+        src = source_data or {}
+        prev = (previous_text or "").strip()
+
+        prompt = self._build_prompt(instr, src, prev)
+        try:
+            text = self.llm_client.complete(prompt, system=llm_prompts.CONTENT_SYSTEM)
+            if text and text.strip():
+                return text.strip()
+            logger.warning("LLM returned empty content; falling back to template.")
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("LLM content generation failed (%s); falling back to template.", exc)
+
+        return self.fallback.generate(
+            instruction=instruction,
+            source_data=source_data,
+            previous_text=previous_text,
+        )
+
+
+# Backward compatibility alias: existing `from .generator import ContentGenerator`
+ContentGenerator = TemplateContentGenerator
+
+
+__all__ = [
+    "ContentGenerator",
+    "TemplateContentGenerator",
+    "LLMContentGenerator",
+]

@@ -44,6 +44,73 @@ pytest tests/ -v
 
 ---
 
+## 本地 LLM + 知识库（可选，私有化部署）
+
+`content.generate` 和 `knowledge.ask` 默认走**确定性模板 / 关键字**路径（`LLM_ENABLED=false`），便于测试和最小部署。需要真实生成和向量检索时，开启本地 LLM 路径：
+
+### 1. 启动 Ollama
+
+```bash
+# 安装（macOS / Linux）
+brew install ollama || curl -fsSL https://ollama.com/install.sh | sh
+
+# 拉取模型（首次）
+ollama pull qwen2.5:7b      # 生成模型
+ollama pull bge-m3          # 嵌入模型
+
+# 启动 server（默认 http://localhost:11434）
+ollama serve
+```
+
+### 2. 安装 Chroma
+
+```bash
+pip install chromadb==0.5.23
+```
+
+### 3. 写配置
+
+复制 `.env.example` 为 `.env`，打开 LLM：
+
+```dotenv
+LLM_ENABLED=true
+LLM_BASE_URL=http://localhost:11434
+LLM_MODEL=qwen2.5:7b
+EMBEDDING_MODEL=bge-m3
+VECTOR_DB_PATH=.chroma
+KNOWLEDGE_DOCS_DIR=data/knowledge_docs
+```
+
+### 4. 构建知识库索引
+
+把制度文档放进 `data/knowledge_docs/*.md`（已附三份示例：采购、年假、报销），然后：
+
+```bash
+python -m app.knowledge.index_builder
+```
+
+### 5. 启动并验证
+
+```bash
+uvicorn main:app --reload
+# POST /api/v1/chat/ask {"message": "采购审批要求是什么"}
+# → answer 由 LLM 合成；citations 指向真实 md 文件路径
+```
+
+### 6. 一键冒烟（推荐）
+
+不想开 server 手动打请求的话，直接：
+
+```bash
+LLM_ENABLED=true python scripts/smoke_llm.py
+# 会对 content.generate + knowledge.ask 各打 3 发真实 Ollama 请求
+# 打印耗时 / 输出预览 / 引用源，全绿返回 0
+```
+
+关掉 `LLM_ENABLED=false` 可随时降级回模板 / 关键字路径，API 契约不变。
+
+---
+
 ## 项目结构
 
 ```

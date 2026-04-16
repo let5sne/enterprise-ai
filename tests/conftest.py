@@ -1,6 +1,8 @@
 """
 Shared pytest fixtures for enterprise-ai backend tests.
 """
+import hashlib
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -51,3 +53,48 @@ def client():
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+# -------- LLM / Embedding test doubles --------
+
+class FakeLLMClient:
+    """Test double implementing the LLMClient protocol.
+
+    Records calls for assertions and returns a fixed response (or per-call
+    callable for dynamic behavior).
+    """
+
+    def __init__(self, response: str | None = "FAKE_LLM_OUTPUT") -> None:
+        self.response = response
+        self.calls: list[dict] = []
+
+    def complete(self, prompt: str, system: str | None = None, **opts) -> str:
+        self.calls.append({"prompt": prompt, "system": system, "opts": opts})
+        if callable(self.response):
+            return self.response(prompt=prompt, system=system, **opts)
+        return self.response or ""
+
+
+class FakeEmbeddingClient:
+    """Deterministic hash-based embedding — no network, no model download."""
+
+    def __init__(self, dim: int = 16) -> None:
+        self.dim = dim
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        out: list[list[float]] = []
+        for text in texts:
+            h = hashlib.sha256((text or "").encode("utf-8")).digest()
+            vec = [h[i % len(h)] / 255.0 for i in range(self.dim)]
+            out.append(vec)
+        return out
+
+
+@pytest.fixture
+def fake_llm_client():
+    return FakeLLMClient()
+
+
+@pytest.fixture
+def fake_embedding_client():
+    return FakeEmbeddingClient()
