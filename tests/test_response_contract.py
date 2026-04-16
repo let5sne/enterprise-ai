@@ -3,6 +3,7 @@ TASK-005: API response contract tests
 验证统一响应协议中各顶层字段、citations、artifacts、task_context、debug 的完整性。
 """
 import pytest
+from pydantic import ValidationError
 
 from app.orchestration.service import OrchestrationService
 from app.schemas.capability import PlanExecutionResult
@@ -91,6 +92,31 @@ def test_chat_ask_response_has_required_fields() -> None:
     assert resp.artifacts == []
     assert resp.task_context is None
     assert resp.debug is None
+    assert resp.contract_version == "v1"
+
+
+def test_chat_ask_response_contract_version_literal() -> None:
+    with pytest.raises(ValidationError):
+        ChatAskResponse(
+            contract_version="v2",  # type: ignore[arg-type]
+            session_id="sess_abc",
+            answer="答案",
+            capabilities_used=[],
+            trace_id="trace_xyz",
+        )
+
+
+def test_chat_ask_response_forbids_unknown_fields() -> None:
+    with pytest.raises(ValidationError):
+        ChatAskResponse.model_validate(
+            {
+                "session_id": "sess_abc",
+                "answer": "答案",
+                "capabilities_used": ["knowledge.ask"],
+                "trace_id": "trace_xyz",
+                "unknown_field": "boom",
+            }
+        )
 
 
 def test_chat_ask_response_with_all_fields() -> None:
@@ -111,6 +137,22 @@ def test_chat_ask_response_with_all_fields() -> None:
     assert resp.task_context.task_type == "knowledge_only"
     assert resp.debug is not None
     assert resp.debug.intent == "knowledge_only"
+
+
+def test_artifact_item_literal_values() -> None:
+    ArtifactItem(artifact_type="table", name="a")
+    ArtifactItem(artifact_type="text", name="a")
+    ArtifactItem(artifact_type="chart", name="a")
+    ArtifactItem(artifact_type="file", name="a")
+
+    with pytest.raises(ValidationError):
+        ArtifactItem(artifact_type="json", name="a")  # type: ignore[arg-type]
+
+
+def test_task_context_status_literal() -> None:
+    TaskContextSnapshot(status="completed")
+    with pytest.raises(ValidationError):
+        TaskContextSnapshot(status="running")  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
@@ -194,6 +236,8 @@ def test_api_response_top_level_fields(client) -> None:
     assert resp.status_code == 200
 
     data = resp.json()
+    assert "contract_version" in data
+    assert data["contract_version"] == "v1"
     assert "session_id" in data
     assert "answer" in data
     assert "capabilities_used" in data
