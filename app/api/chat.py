@@ -33,14 +33,10 @@ async def chat_ask(
     artifacts = execution_result.aggregated_artifacts
     raw_sql = execution_result.aggregated_raw_sql
 
-    task_context = TaskContextSnapshot(
+    task_context = orchestration_service.build_task_snapshot(session_id) or TaskContextSnapshot(
         task_type=execution_result.intent,
         status="completed",
         summary=execution_result.summary_text,
-        important_outputs={
-            "latest_output_type": _infer_output_type(execution_result.intent),
-            "followup_ready": True,
-        },
     )
 
     debug = ResponseDebugInfo(
@@ -59,13 +55,3 @@ async def chat_ask(
         trace_id=f"trace_{uuid.uuid4().hex[:12]}",
         debug=debug,
     )
-
-
-def _infer_output_type(intent: str) -> str:
-    if "knowledge" in intent:
-        return "knowledge"
-    if "data" in intent:
-        return "data"
-    if "content" in intent:
-        return "content"
-    return "mixed"

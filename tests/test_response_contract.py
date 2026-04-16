@@ -316,3 +316,47 @@ def test_api_response_answer_always_present(client) -> None:
     assert data["answer"]
     assert isinstance(data["answer"], str)
     assert len(data["answer"]) > 0
+
+
+# ---------------------------------------------------------------------------
+# task_context 真实快照测试（非推断值）
+# ---------------------------------------------------------------------------
+
+
+def test_api_task_context_reflects_real_task_for_data(client) -> None:
+    payload = {"user_id": "u1", "source": "web", "message": "上个月哪个部门成本最高"}
+    resp = client.post("/api/v1/chat/ask", json=payload)
+    assert resp.status_code == 200
+
+    tc = resp.json()["task_context"]
+    assert tc["task_type"] == "data_only"
+    outputs = tc["important_outputs"]
+    assert outputs["latest_output_type"] == "data"
+    assert outputs["latest_capability_code"] == "data.analyze"
+    assert outputs["followup_ready"] is True
+    assert tc["summary"]
+
+
+def test_api_task_context_reflects_real_task_for_knowledge(client) -> None:
+    payload = {"user_id": "u1", "source": "web", "message": "报销流程是什么"}
+    resp = client.post("/api/v1/chat/ask", json=payload)
+    assert resp.status_code == 200
+
+    tc = resp.json()["task_context"]
+    assert tc["task_type"] == "knowledge_only"
+    outputs = tc["important_outputs"]
+    assert outputs["latest_output_type"] == "knowledge"
+    assert outputs["latest_capability_code"] == "knowledge.ask"
+    assert outputs["followup_ready"] is True
+
+
+def test_api_task_context_does_not_leak_heavy_fields(client) -> None:
+    payload = {"user_id": "u1", "source": "web", "message": "上个月哪个部门成本最高"}
+    resp = client.post("/api/v1/chat/ask", json=payload)
+    assert resp.status_code == 200
+
+    outputs = resp.json()["task_context"]["important_outputs"]
+    # lightweight snapshot must not expose raw structured data or user message
+    assert "latest_structured_result" not in outputs
+    assert "latest_user_message" not in outputs
+    assert "latest_summary_text" not in outputs

@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from app.context.store import InMemoryContextStore
 from app.schemas.capability import CapabilityExecutionResult, ExecutionPlan, PlanExecutionResult, PlanStep
+from app.schemas.chat import TaskContextSnapshot
 from app.schemas.context import TaskContext
 
 from .capability_mapper import CapabilityMapper
@@ -119,6 +120,32 @@ class OrchestrationService:
             self.context_store.append_message(session_id, "assistant", result.summary_text)
 
         return result
+
+
+    def build_task_snapshot(self, session_id: str | None) -> TaskContextSnapshot | None:
+        """Build a lightweight TaskContextSnapshot from the real TaskContext.
+
+        Returns None when no session is provided. Only exposes fields that are
+        safe and useful for clients (e.g. followup routing hints); heavy payloads
+        such as ``latest_structured_result`` are intentionally excluded.
+        """
+        if not session_id:
+            return None
+
+        task = self.context_store.get_task(session_id)
+        outputs = task.important_outputs or {}
+
+        exposed: dict[str, Any] = {}
+        for key in ("latest_output_type", "followup_ready", "latest_capability_code"):
+            if key in outputs:
+                exposed[key] = outputs[key]
+
+        return TaskContextSnapshot(
+            task_type=task.latest_intent,
+            status="completed",
+            summary=outputs.get("latest_summary_text"),
+            important_outputs=exposed,
+        )
 
 
     def _build_followup_plan(
