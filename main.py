@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.chat import router as chat_router
 from app.config import settings
 from app.database.db import init_db
 from app.routers import content, data, knowledge, process
@@ -29,6 +30,7 @@ app.include_router(knowledge.router, prefix="/api/v1")
 app.include_router(data.router, prefix="/api/v1")
 app.include_router(content.router, prefix="/api/v1")
 app.include_router(process.router, prefix="/api/v1")
+app.include_router(chat_router, prefix="/api/v1")
 
 
 @app.get("/", tags=["健康检查"])

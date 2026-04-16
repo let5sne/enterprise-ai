@@ -13,7 +13,7 @@
 - followup question builder extraction
 
 ## 当前阶段
-- unified response contract
+- API contract stabilization
 
 ## 下一阶段候选
 - response contract for citations / artifacts / debug

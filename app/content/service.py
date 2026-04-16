@@ -1,9 +1,17 @@
-from .generator import ContentGenerator
+from app.config import settings
+from app.llm.client import get_default_llm_client
+
+from .generator import LLMContentGenerator, TemplateContentGenerator
 
 
 class ContentService:
-    def __init__(self) -> None:
-        self.generator = ContentGenerator()
+    def __init__(self, generator=None) -> None:
+        if generator is not None:
+            self.generator = generator
+        elif settings.llm_enabled:
+            self.generator = LLMContentGenerator(llm_client=get_default_llm_client())
+        else:
+            self.generator = TemplateContentGenerator()
 
     def generate(
         self,

@@ -9,3 +9,9 @@ pytest==8.3.4
 pytest-asyncio==0.25.2
 aiosqlite==0.20.0
 greenlet==3.1.1
+
+# --- Optional: local RAG (required only when LLM_ENABLED=true) ---
+# Install separately on private deployments:
+#   pip install chromadb==0.5.23
+# Kept optional to keep the baseline install light; VectorRetriever
+# imports chromadb lazily so tests without chromadb still pass.

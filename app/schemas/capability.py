@@ -2,6 +2,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.schemas.chat import ArtifactItem, CitationItem
+
 
 class InputBinding(BaseModel):
     from_step_no: int
@@ -29,6 +31,8 @@ class CapabilityExecutionResult(BaseModel):
     human_readable_text: str | None = None
     structured_result: dict[str, Any] = Field(default_factory=dict)
     raw_data: dict[str, Any] = Field(default_factory=dict)
+    citations: list[CitationItem] = Field(default_factory=list)
+    artifacts: list[ArtifactItem] = Field(default_factory=list)
     error: str | None = None
 
 
@@ -50,3 +54,31 @@ class PlanExecutionResult(BaseModel):
             if item.success and item.structured_result:
                 return item.structured_result
         return {}
+
+    @property
+    def aggregated_citations(self) -> list[CitationItem]:
+        seen: set[tuple[str, str | None]] = set()
+        result: list[CitationItem] = []
+        for step in self.step_results:
+            if step.success:
+                for c in step.citations:
+                    key = (c.source_type, c.title)
+                    if key not in seen:
+                        seen.add(key)
+                        result.append(c)
+        return result
+
+    @property
+    def aggregated_artifacts(self) -> list[ArtifactItem]:
+        result: list[ArtifactItem] = []
+        for step in self.step_results:
+            if step.success:
+                result.extend(step.artifacts)
+        return result
+
+    @property
+    def aggregated_raw_sql(self) -> str | None:
+        for step in reversed(self.step_results):
+            if step.success and step.raw_data.get("raw_sql"):
+                return str(step.raw_data["raw_sql"])
+        return None

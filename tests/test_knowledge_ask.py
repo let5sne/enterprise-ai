@@ -1,5 +1,6 @@
 from app.knowledge import KnowledgeService
 from app.orchestration.service import OrchestrationService
+from app.schemas.chat import CitationItem
 
 
 def test_knowledge_service_returns_answer_and_citations() -> None:
@@ -18,8 +19,9 @@ def test_knowledge_service_fallback_for_unknown_question() -> None:
     answer, structured = service.ask("这个问题和制度无关")
 
     assert "未命中专项制度" in answer
-    assert structured.get("citations")
-    assert structured["citations"][0]["source"] == "制度知识库-通用指引"
+    citations: list[CitationItem] = structured.get("citations", [])  # type: ignore[assignment]
+    assert citations
+    assert citations[0].locator == "制度知识库-通用指引"
 
 
 def test_orchestration_knowledge_only_chain() -> None:
@@ -32,3 +34,5 @@ def test_orchestration_knowledge_only_chain() -> None:
     assert result.step_results[0].capability_code == "knowledge.ask"
     assert result.step_results[0].success is True
     assert "根据制度资料" in (result.step_results[0].human_readable_text or "")
+    assert len(result.step_results[0].citations) > 0
+    assert result.step_results[0].citations[0].source_type == "memory_doc"

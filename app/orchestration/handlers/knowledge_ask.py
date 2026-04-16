@@ -2,6 +2,7 @@ from typing import Any
 
 from app.knowledge import KnowledgeService
 from app.schemas.capability import CapabilityExecutionResult, PlanStep
+from app.schemas.chat import CitationItem
 
 
 class KnowledgeAskHandler:
@@ -21,11 +22,14 @@ class KnowledgeAskHandler:
                 error=f"execution error: {exc}",
             )
 
+        citations: list[CitationItem] = structured.get("citations", [])
+
         return CapabilityExecutionResult(
             step_no=step.step_no,
             capability_code=step.capability_code,
             success=True,
             human_readable_text=answer,
-            structured_result=structured,
-            raw_data={"citations": structured.get("citations", []), "source": "knowledge_service"},
+            structured_result={"answer": structured.get("answer", answer)},
+            raw_data={"source": "knowledge_service"},
+            citations=citations,
         )
