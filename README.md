@@ -56,6 +56,7 @@ uvicorn main:app --reload
 - `docs/BUDGET_ASSISTANT_DEMO.md`
 - `docs/BUDGET_ASSISTANT_DEMO_SCRIPT.md`
 - `docs/BUDGET_ASSISTANT_PRODUCT_BRIEF.md`
+- `docs/BUDGET_ASSISTANT_PILOT_CHECKLIST.md`
 
 ---
 
