@@ -26,7 +26,11 @@ def test_budget_department_overrun_demo(client) -> None:
     assert tables and tables[0]["name"] == "budget_analysis_result"
     assert charts and charts[0]["name"] == "budget_analysis_chart"
     assert tables[0]["metadata"]["analysis_type"] == "budget_overrun_ranking"
+    assert tables[0]["metadata"]["dimension_label"] == "部门"
+    assert tables[0]["metadata"]["metric_label"] == "超预算金额"
     assert charts[0]["metadata"]["analysis_type"] == "budget_overrun_ranking"
+    chart_content = charts[0]["content"]
+    assert len(chart_content["categories"]) == len(chart_content["series"][0]["data"])
 
 
 def test_budget_project_overrun_ranking_demo(client) -> None:
@@ -38,9 +42,13 @@ def test_budget_project_overrun_ranking_demo(client) -> None:
     assert response.status_code == 200
     payload = response.json()
     table = _artifact_by_type(payload, "table")[0]
+    chart = _artifact_by_type(payload, "chart")[0]
     rows = table["content"]
     assert table["metadata"]["dimension_label"] == "项目"
+    assert table["metadata"]["metric_label"] == "超预算金额"
     assert table["metadata"]["analysis_type"] == "project_overrun_ranking"
+    chart_content = chart["content"]
+    assert len(chart_content["categories"]) == len(chart_content["series"][0]["data"])
     assert rows[0]["dimension_name"] == "春季获客项目"
     assert rows[0]["variance_amount"] == 34000
 
@@ -53,8 +61,14 @@ def test_budget_month_comparison_demo(client) -> None:
 
     assert response.status_code == 200
     payload = response.json()
+    table = _artifact_by_type(payload, "table")[0]
     chart = _artifact_by_type(payload, "chart")[0]
     content = chart["content"]
+    assert payload["answer"]
+    assert payload["debug"]["raw_sql"]
+    assert table["metadata"]["analysis_type"] == "month_comparison"
+    assert table["metadata"]["dimension_label"] == "月份"
+    assert table["metadata"]["metric_label"] == "实际发生金额"
     assert chart["metadata"]["analysis_type"] == "month_comparison"
     assert content["categories"] == ["2026-04", "2026-03"]
     assert len(content["categories"]) == len(content["series"][0]["data"])
