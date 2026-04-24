@@ -1,6 +1,5 @@
-from fastapi import FastAPI
+"""Compatibility entrypoint that re-exports the root FastAPI app."""
 
-from app.api.chat import router as chat_router
+from main import app
 
-app = FastAPI(title="Enterprise AI Backend")
-app.include_router(chat_router, prefix="/api/v1")
+__all__ = ["app"]

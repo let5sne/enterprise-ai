@@ -1,7 +1,7 @@
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.orchestration.service import OrchestrationService
 from app.schemas.chat import ChatAskRequest, ChatAskResponse, ResponseDebugInfo, TaskContextSnapshot
@@ -10,8 +10,11 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def get_orchestration_service() -> OrchestrationService:
-    return OrchestrationService()
+def get_orchestration_service(request: Request) -> OrchestrationService:
+    service = getattr(request.app.state, "orchestration_service", None)
+    if service is None:
+        raise RuntimeError("orchestration service is not configured")
+    return service
 
 
 @router.post("/chat/ask", response_model=ChatAskResponse)

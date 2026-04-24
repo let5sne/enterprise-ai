@@ -2,6 +2,7 @@ from typing import Any
 
 from app.content import ContentService
 from app.schemas.capability import CapabilityExecutionResult, PlanStep
+from app.schemas.chat import ArtifactItem
 
 
 class ContentGenerateHandler:
@@ -25,6 +26,21 @@ class ContentGenerateHandler:
                 error=f"execution error: {exc}",
             )
 
+        artifacts: list[ArtifactItem] = []
+        if text:
+            followup_type = payload.get("followup_type")
+            artifacts.append(
+                ArtifactItem(
+                    artifact_type="text",
+                    name="generated_content",
+                    content=text,
+                    metadata={
+                        "source_intent": str(followup_type) if followup_type else "content_generate",
+                        "word_count": len(text),
+                    },
+                )
+            )
+
         return CapabilityExecutionResult(
             step_no=step.step_no,
             capability_code=step.capability_code,
@@ -32,4 +48,5 @@ class ContentGenerateHandler:
             human_readable_text=text,
             structured_result=structured,
             raw_data={"source": "content_service"},
+            artifacts=artifacts,
         )

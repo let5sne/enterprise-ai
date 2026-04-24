@@ -70,10 +70,17 @@ class PlanExecutionResult(BaseModel):
 
     @property
     def aggregated_artifacts(self) -> list[ArtifactItem]:
+        seen: set[tuple[str, str]] = set()
         result: list[ArtifactItem] = []
         for step in self.step_results:
-            if step.success:
-                result.extend(step.artifacts)
+            if not step.success:
+                continue
+            for a in step.artifacts:
+                key = (a.artifact_type, a.name)
+                if key in seen:
+                    continue
+                seen.add(key)
+                result.append(a)
         return result
 
     @property

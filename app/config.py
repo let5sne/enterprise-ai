@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     database_url: str = "sqlite:///./enterprise_ai.db"
     debug: bool = False
+    # Session/task context TTL in seconds. None means no automatic expiration.
+    context_ttl_seconds: float | None = None
 
     # --- Local LLM / RAG (private deployment) ---
     # When False, content.generate uses TemplateContentGenerator and
