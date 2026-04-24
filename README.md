@@ -54,6 +54,7 @@ uvicorn main:app --reload
 
 - `python scripts/smoke_budget_demo.py`
 - `docs/BUDGET_ASSISTANT_DEMO.md`
+- `docs/BUDGET_ASSISTANT_DEMO_SCRIPT.md`
 - `docs/BUDGET_ASSISTANT_PRODUCT_BRIEF.md`
 
 ---
