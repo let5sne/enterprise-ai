@@ -29,6 +29,8 @@ uvicorn main:app --reload
 
 服务默认运行在 `http://127.0.0.1:8000`。
 
+主入口以 `main.py` 为准。`app/main.py` 仅保留为兼容别名，直接复用同一个 `app`，不会引入额外路由、重复的 lifespan，或遗漏 `app.state.orchestration_service` 初始化。
+
 ### 交互式 API 文档
 
 - Swagger UI：`http://127.0.0.1:8000/docs`

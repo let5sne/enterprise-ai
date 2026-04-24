@@ -318,6 +318,13 @@ def test_api_followup_reuses_context_across_requests(client) -> None:
     assert "领导您好" in second_data["answer"]
 
 
+def test_app_main_reuses_root_app_entrypoint() -> None:
+    from app.main import app as app_main
+    from main import app as root_app
+
+    assert app_main is root_app
+
+
 def test_api_response_debug_contains_raw_sql_for_data(client) -> None:
     payload = {"user_id": "u1", "source": "web", "message": "上个月哪个部门成本最高"}
     resp = client.post("/api/v1/chat/ask", json=payload)
