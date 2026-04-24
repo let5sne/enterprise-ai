@@ -35,7 +35,13 @@ class FollowupQuestionBuilder:
         if "最低" in message or "最高" in message:
             return f"基于“{base}”，请按“{message}”这个排序方向继续分析。"
 
-        if "按部门" in message or "按产品" in message or "展开" in message:
+        if (
+            "按部门" in message
+            or "按产品" in message
+            or "预算科目" in message
+            or "科目" in message
+            or "展开" in message
+        ):
             return f"基于“{base}”，请按“{message}”这个维度继续展开分析。"
 
         return f"基于刚才的数据分析需求“{base}”，请继续按这个要求处理：{message}"

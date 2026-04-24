@@ -38,6 +38,23 @@ class TemplateContentGenerator:
         previous_text = (previous_text or "").strip()
         normalized = instruction.strip()
 
+        if "rows" in source_data and "meta" in source_data:
+            rows = source_data.get("rows") or []
+            meta = source_data.get("meta") or {}
+            if rows:
+                top = rows[0]
+                dimension_label = meta.get("dimension_label", "对象")
+                metric_label = meta.get("metric_label", "超预算金额")
+                return (
+                    "领导您好，现将本月预算执行情况简要汇报如下："
+                    f"本月共有{len(rows)}个{dimension_label}出现超预算，"
+                    f"其中{top.get('dimension_name')}偏差最为突出，"
+                    f"{metric_label}为{top.get('variance_amount')}元，"
+                    f"超预算率为{top.get('variance_rate', 0) * 100:.2f}%。"
+                    "建议后续重点复盘费用发生原因，明确责任归口，"
+                    "并对高偏差事项制定压降和预算过程管控措施。"
+                )
+
         # Prefer refinement against previous output when available.
         if previous_text:
             if "再正式一点" in normalized or "更正式一点" in normalized:
