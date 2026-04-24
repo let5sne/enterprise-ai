@@ -36,6 +36,20 @@ uvicorn main:app --reload
 - Swagger UI：`http://127.0.0.1:8000/docs`
 - ReDoc：`http://127.0.0.1:8000/redoc`
 
+### 预算 Demo 请求
+
+```json
+{"user_id":"u1","source":"web","message":"本月哪些部门超预算？"}
+```
+
+```json
+{"session_id":"sess_budget_demo","user_id":"u1","source":"web","message":"按预算科目展开一下"}
+```
+
+```json
+{"session_id":"sess_budget_demo","user_id":"u1","source":"web","message":"写成给领导看的经营分析说明"}
+```
+
 ---
 
 ## 运行测试

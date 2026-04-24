@@ -1,5 +1,8 @@
 from app.schemas.data import DataAnalysisResult
 
+from .budget_executor import BudgetDemoExecutor
+from .budget_semantic import BudgetSemanticParser
+from .budget_summarizer import BudgetResultSummarizer
 from .intent_parser import QueryIntentParser
 from .query_executor import QueryExecutor
 from .semantic_layer import SemanticLayer
@@ -16,8 +19,25 @@ class DataService:
         self.sql_guard = SQLGuard()
         self.executor = QueryExecutor()
         self.summarizer = ResultSummarizer()
+        self.budget_semantic = BudgetSemanticParser()
+        self.budget_executor = BudgetDemoExecutor()
+        self.budget_summarizer = BudgetResultSummarizer()
 
     def analyze(self, question: str) -> DataAnalysisResult:
+        budget_intent = self.budget_semantic.parse(question)
+        if budget_intent:
+            structured_result = self.budget_executor.execute(
+                analysis_type=budget_intent.analysis_type,
+                dimension=budget_intent.dimension,
+            )
+            summary_text = self.budget_summarizer.summarize(structured_result)
+            return DataAnalysisResult(
+                success=True,
+                summary_text=summary_text,
+                structured_result=structured_result,
+                raw_sql=str(structured_result.get("raw_sql") or ""),
+            )
+
         intent = self.intent_parser.parse(question)
 
         metric_info = self.semantic.resolve_metric(question)

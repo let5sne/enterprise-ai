@@ -35,6 +35,9 @@ class FollowupTypeClassifier:
         "趋势",
         "按部门",
         "按产品",
+        "按预算科目",
+        "预算科目",
+        "科目",
         "展开",
     )
     KNOWLEDGE_CONTINUE_KEYWORDS = (
