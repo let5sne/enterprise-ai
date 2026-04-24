@@ -1,3 +1,5 @@
+from concurrent.futures import ThreadPoolExecutor
+
 from app.context.store import InMemoryContextStore
 from app.orchestration.followup_resolver import FollowupResolver
 from app.orchestration.service import OrchestrationService
@@ -150,3 +152,63 @@ def test_followup_with_empty_previous_text_falls_back_to_normal_plan() -> None:
     result = orchestration.run("再正式一点", session_id=session_id)
 
     assert result.intent != "content_followup"
+
+
+def test_context_store_returns_isolated_copies() -> None:
+    store = InMemoryContextStore()
+
+    task = store.get_task("sess_isolated")
+    task.latest_intent = "tampered"
+    task.important_outputs["latest_summary_text"] = "tampered"
+
+    stored_task = store.get_task("sess_isolated")
+
+    assert stored_task.latest_intent is None
+    assert stored_task.important_outputs == {}
+
+
+def test_update_task_preserves_original_state_when_updater_raises() -> None:
+    store = InMemoryContextStore()
+    store.update_task(
+        "sess_rollback",
+        lambda task: task.important_outputs.update({"counter": 1}),
+    )
+
+    def raising_updater(task) -> None:
+        task.latest_intent = "should_not_persist"
+        task.important_outputs["counter"] = 2
+        raise ValueError("boom")
+
+    try:
+        store.update_task("sess_rollback", raising_updater)
+    except ValueError as exc:
+        assert str(exc) == "boom"
+    else:
+        raise AssertionError("expected ValueError")
+
+    stored_task = store.get_task("sess_rollback")
+
+    assert stored_task.latest_intent is None
+    assert stored_task.important_outputs["counter"] == 1
+
+
+def test_update_task_is_atomic_under_concurrent_updates() -> None:
+    store = InMemoryContextStore()
+    session_id = "sess_concurrent"
+    update_count = 40
+
+    def increment_counter() -> None:
+        def updater(task) -> None:
+            current = task.important_outputs.get("counter", 0)
+            task.important_outputs["counter"] = current + 1
+
+        store.update_task(session_id, updater)
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(increment_counter) for _ in range(update_count)]
+        for future in futures:
+            future.result()
+
+    stored_task = store.get_task(session_id)
+
+    assert stored_task.important_outputs["counter"] == update_count

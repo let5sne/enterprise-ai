@@ -1,8 +1,14 @@
 from typing import Any
 from uuid import uuid4
 
+from app.config import settings
 from app.context.store import InMemoryContextStore
-from app.schemas.capability import CapabilityExecutionResult, ExecutionPlan, PlanExecutionResult, PlanStep
+from app.schemas.capability import (
+    CapabilityExecutionResult,
+    ExecutionPlan,
+    PlanExecutionResult,
+    PlanStep,
+)
 from app.schemas.chat import TaskContextSnapshot
 from app.schemas.context import TaskContext
 
@@ -31,7 +37,9 @@ class OrchestrationService:
         self.followup_resolver = FollowupResolver()
         self.followup_type_classifier = FollowupTypeClassifier()
         self.followup_question_builder = FollowupQuestionBuilder()
-        self.context_store = context_store or InMemoryContextStore()
+        self.context_store = context_store or InMemoryContextStore(
+            ttl_seconds=settings.context_ttl_seconds
+        )
 
     def plan(self, message: str, task_context: TaskContext | None = None) -> ExecutionPlan:
         if self.followup_resolver.should_resume(message, task_context):
@@ -105,7 +113,6 @@ class OrchestrationService:
             step_results=step_results,
         )
 
-
     def run(self, message: str, session_id: str | None = None) -> PlanExecutionResult:
         task_context = self.context_store.get_task(session_id) if session_id else None
 
@@ -120,7 +127,6 @@ class OrchestrationService:
             self.context_store.append_message(session_id, "assistant", result.summary_text)
 
         return result
-
 
     def build_task_snapshot(self, session_id: str | None) -> TaskContextSnapshot | None:
         """Build a lightweight TaskContextSnapshot from the real TaskContext.
@@ -229,8 +235,6 @@ class OrchestrationService:
         result: PlanExecutionResult,
         source_message: str,
     ) -> None:
-        task = self.context_store.get_task(session_id)
-
         latest_success_capability_code = None
         for step_result in reversed(result.step_results):
             if step_result.success:
@@ -243,21 +247,25 @@ class OrchestrationService:
                 real_summary_text = step_result.human_readable_text
                 break
 
-        task.latest_intent = plan.intent
-        task.latest_plan_id = plan.plan_id
-        task.last_successful_step_no = max(
+        last_successful_step_no = max(
             (step.step_no for step in result.step_results if step.success),
             default=0,
         )
-        task.important_outputs = {
-            "latest_user_message": source_message,
-            "latest_structured_result": result.merged_structured_result,
-            "latest_summary_text": real_summary_text,
-            "latest_capability_code": latest_success_capability_code,
-            "latest_output_type": self._resolve_output_type(latest_success_capability_code),
-            "followup_ready": bool(latest_success_capability_code and real_summary_text),
-        }
-        self.context_store.save_task(task)
+
+        def apply_update(task: TaskContext) -> None:
+            task.latest_intent = plan.intent
+            task.latest_plan_id = plan.plan_id
+            task.last_successful_step_no = last_successful_step_no
+            task.important_outputs = {
+                "latest_user_message": source_message,
+                "latest_structured_result": result.merged_structured_result,
+                "latest_summary_text": real_summary_text,
+                "latest_capability_code": latest_success_capability_code,
+                "latest_output_type": self._resolve_output_type(latest_success_capability_code),
+                "followup_ready": bool(latest_success_capability_code and real_summary_text),
+            }
+
+        self.context_store.update_task(session_id, apply_update)
 
     def _resolve_output_type(self, capability_code: str | None) -> str:
         if capability_code == "content.generate":
@@ -267,7 +275,6 @@ class OrchestrationService:
         if capability_code == "knowledge.ask":
             return "knowledge"
         return ""
-
 
     def _apply_input_bindings(
         self,

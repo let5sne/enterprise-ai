@@ -286,6 +286,38 @@ def test_api_response_task_context_shape(client) -> None:
     assert "important_outputs" in tc
 
 
+def test_api_followup_reuses_context_across_requests(client) -> None:
+    session_id = "sess_api_followup_001"
+
+    first = client.post(
+        "/api/v1/chat/ask",
+        json={
+            "session_id": session_id,
+            "user_id": "u1",
+            "source": "web",
+            "message": "帮我看上个月哪个部门成本最高",
+        },
+    )
+    assert first.status_code == 200
+    first_data = first.json()
+    assert first_data["debug"]["intent"] == "data_only"
+
+    second = client.post(
+        "/api/v1/chat/ask",
+        json={
+            "session_id": session_id,
+            "user_id": "u1",
+            "source": "web",
+            "message": "改成发给领导的版本",
+        },
+    )
+    assert second.status_code == 200
+    second_data = second.json()
+
+    assert second_data["debug"]["intent"] == "content_from_previous_data"
+    assert "领导您好" in second_data["answer"]
+
+
 def test_api_response_debug_contains_raw_sql_for_data(client) -> None:
     payload = {"user_id": "u1", "source": "web", "message": "上个月哪个部门成本最高"}
     resp = client.post("/api/v1/chat/ask", json=payload)

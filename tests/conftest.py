@@ -50,9 +50,17 @@ def clean_tables():
 @pytest.fixture
 def client():
     app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
+    try:
+        with TestClient(app) as c:
+            orchestration_service = getattr(app.state, "orchestration_service", None)
+            if orchestration_service is not None:
+                orchestration_service.context_store.clear()
+            yield c
+    finally:
+        orchestration_service = getattr(app.state, "orchestration_service", None)
+        if orchestration_service is not None:
+            orchestration_service.context_store.clear()
+        app.dependency_overrides.clear()
 
 
 # -------- LLM / Embedding test doubles --------

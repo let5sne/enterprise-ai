@@ -9,12 +9,14 @@ from fastapi import FastAPI
 from app.api.chat import router as chat_router
 from app.config import settings
 from app.database.db import init_db
+from app.orchestration.service import OrchestrationService
 from app.routers import content, data, knowledge, process
 
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     init_db()
+    application.state.orchestration_service = OrchestrationService()
     yield
 
 

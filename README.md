@@ -79,7 +79,10 @@ LLM_MODEL=qwen2.5:7b
 EMBEDDING_MODEL=bge-m3
 VECTOR_DB_PATH=.chroma
 KNOWLEDGE_DOCS_DIR=data/knowledge_docs
+CONTEXT_TTL_SECONDS=3600
 ```
+
+`CONTEXT_TTL_SECONDS` 用于控制内存中的会话 / task context 过期时间，默认留空表示不自动过期；如需主动清理全部过期条目，可周期性调用 store 的 `cleanup()`。
 
 ### 4. 构建知识库索引
 
