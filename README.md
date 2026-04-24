@@ -50,6 +50,11 @@ uvicorn main:app --reload
 {"session_id":"sess_budget_demo","user_id":"u1","source":"web","message":"写成给领导看的经营分析说明"}
 ```
 
+演示脚本与讲解说明：
+
+- `python scripts/smoke_budget_demo.py`
+- `docs/BUDGET_ASSISTANT_DEMO.md`
+
 ---
 
 ## 运行测试
